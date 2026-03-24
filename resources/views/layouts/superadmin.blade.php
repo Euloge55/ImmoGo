@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin — @yield('title')</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Poppins', sans-serif; }
+        :root { --primary: #4ECDC4; --dark: #2C3E50; }
+        .sidebar {
+            width: 260px;
+            min-height: 100vh;
+            background: var(--dark);
+            position: fixed;
+            top: 0; left: 0;
+            z-index: 100;
+            overflow-y: auto;
+        }
+        .sidebar-brand {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar-avatar {
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            background: rgba(78,205,196,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .sidebar-menu { padding: 20px 0; }
+        .sidebar-menu a {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+        }
+        .sidebar-menu a:hover,
+        .sidebar-menu a.active {
+            background: rgba(78,205,196,0.15);
+            color: var(--primary);
+            border-left: 3px solid var(--primary);
+        }
+        .sidebar-menu a i { width: 25px; margin-right: 10px; font-size: 15px; }
+        .sidebar-section-title {
+            padding: 8px 20px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.3);
+            font-weight: 600;
+        }
+        .main-content {
+            margin-left: 260px;
+            min-height: 100vh;
+            background: #f8f9fa;
+        }
+        .topbar {
+            background: white;
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .content { padding: 30px; }
+        .stat-card {
+            border: none;
+            border-radius: 16px;
+            padding: 25px;
+            color: white;
+        }
+        .stat-number { font-size: 2rem; font-weight: 800; }
+        .badge-superadmin {
+            background: rgba(78,205,196,0.2);
+            color: #4ECDC4;
+            border: 1px solid #4ECDC4;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+        .logout-btn {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: #e74c3c !important;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            cursor: pointer;
+            background: none;
+            border-top: none;
+            border-right: none;
+            border-bottom: none;
+            width: 100%;
+        }
+        .logout-btn:hover {
+            background: rgba(231,76,60,0.1);
+            border-left: 3px solid #e74c3c;
+        }
+        .logout-btn i { width: 25px; margin-right: 10px; }
+    </style>
+    @yield('styles')
+</head>
+<body>
+
+<!-- SIDEBAR SUPER ADMIN -->
+<div class="sidebar">
+    <div class="sidebar-brand">
+        <div class="d-flex align-items-center mb-2">
+            <i class="fas fa-building fa-lg me-2" style="color:#4ECDC4"></i>
+            <h5 class="text-white fw-bold mb-0">ImmoGo</h5>
+        </div>
+        <div class="d-flex align-items-center mt-3">
+            <div class="sidebar-avatar me-3">
+                <i class="fas fa-shield-alt" style="color:#4ECDC4"></i>
+            </div>
+            <div>
+                <p class="text-white fw-semibold mb-0 small">
+                    {{ session('superadmin')->nom_superadmin }}
+                </p>
+                <span class="badge-superadmin">
+                    <i class="fas fa-crown me-1" style="font-size:8px"></i>
+                    Super Admin
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MENU SUPER ADMIN UNIQUEMENT -->
+    <div class="sidebar-menu">
+        <div class="sidebar-section-title">Navigation</div>
+
+        <a href="{{ route('superadmin.dashboard') }}"
+           class="{{ request()->routeIs('superadmin.dashboard') ? 'active' : '' }}">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+        </a>
+
+        <a href="{{ route('superadmin.agences') }}"
+           class="{{ request()->routeIs('superadmin.agences') ? 'active' : '' }}">
+            <i class="fas fa-building"></i> Agences
+        </a>
+
+        <hr style="border-color:rgba(255,255,255,0.1); margin:15px 20px">
+        <div class="sidebar-section-title">Compte</div>
+
+        <form action="{{ route('logout') }}" method="POST">
+            @csrf
+            <button type="submit" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i> Déconnexion
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- CONTENU PRINCIPAL -->
+<div class="main-content">
+    <div class="topbar">
+        <h6 class="mb-0 fw-bold">@yield('title')</h6>
+        <span class="text-muted small">
+            <i class="fas fa-shield-alt me-1" style="color:#4ECDC4"></i>
+            {{ session('superadmin')->nom_superadmin }}
+            <span class="badge ms-1"
+                  style="background:#4ECDC4; color:white; font-size:10px">
+                Super Admin
+            </span>
+        </span>
+    </div>
+
+    <div class="content">
+        @if(session('success'))
+            <div class="alert alert-success alert-dismissible fade show
+                        border-0 rounded-3"
+                 style="border-left:4px solid #2ecc71 !important">
+                <i class="fas fa-check-circle me-2" style="color:#2ecc71"></i>
+                {{ session('success') }}
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+        @if(session('error'))
+            <div class="alert alert-danger alert-dismissible fade show
+                        border-0 rounded-3"
+                 style="border-left:4px solid #e74c3c !important">
+                <i class="fas fa-exclamation-circle me-2"
+                   style="color:#e74c3c"></i>
+                {{ session('error') }}
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+        @if($errors->any())
+            <div class="alert alert-warning alert-dismissible fade show
+                        border-0 rounded-3"
+                 style="border-left:4px solid #f39c12 !important">
+                <i class="fas fa-exclamation-triangle me-2"
+                   style="color:#f39c12"></i>
+                <strong>Erreurs :</strong>
+                <ul class="mb-0 mt-1">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
+        @yield('content')
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+@yield('scripts')
+</body>
+</html>

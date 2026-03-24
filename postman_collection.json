@@ -1,0 +1,203 @@
+{
+  "info": {
+    "name": "ImmoGo — Localisation API",
+    "description": "Tests des endpoints de localisation (Département, Ville, Quartier)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api",
+      "description": "URL de base. Changer pour l'IP locale si device physique : http://192.168.1.X:8000/api"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. GET Départements",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Réponse est un tableau', () => {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.be.an('array');",
+              "  pm.expect(json.length).to.be.greaterThan(0);",
+              "  pm.expect(json[0]).to.have.property('id_departement');",
+              "  pm.expect(json[0]).to.have.property('nom_departement');",
+              "  // Sauvegarder le premier id pour les tests suivants",
+              "  pm.collectionVariables.set('dep_id', json[0].id_departement);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/departements",
+          "host": ["{{base_url}}"],
+          "path": ["departements"]
+        }
+      }
+    },
+    {
+      "name": "2. GET Villes d'un département",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Réponse est un tableau de villes', () => {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.be.an('array');",
+              "  if (json.length > 0) {",
+              "    pm.expect(json[0]).to.have.property('id_ville');",
+              "    pm.expect(json[0]).to.have.property('nom_ville');",
+              "    pm.collectionVariables.set('ville_id', json[0].id_ville);",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/departements/{{dep_id}}/villes",
+          "host": ["{{base_url}}"],
+          "path": ["departements", "{{dep_id}}", "villes"]
+        }
+      }
+    },
+    {
+      "name": "3. GET Quartiers d'une ville",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Réponse est un tableau de quartiers', () => {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.be.an('array');",
+              "  if (json.length > 0) {",
+              "    pm.expect(json[0]).to.have.property('id_quartier');",
+              "    pm.expect(json[0]).to.have.property('nom_quartier');",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/villes/{{ville_id}}/quartiers",
+          "host": ["{{base_url}}"],
+          "path": ["villes", "{{ville_id}}", "quartiers"]
+        }
+      }
+    },
+    {
+      "name": "4. GET Département inexistant (404)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 404', () => pm.response.to.have.status(404));",
+              "pm.test('Message d erreur présent', () => {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.have.property('message');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/departements/99999/villes",
+          "host": ["{{base_url}}"],
+          "path": ["departements", "99999", "villes"]
+        }
+      }
+    },
+    {
+      "name": "5. GET Recherche biens (Littoral)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Réponse paginée', () => {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.have.property('data');",
+              "  pm.expect(json).to.have.property('current_page');",
+              "  pm.expect(json).to.have.property('total');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/recherche?id_departement={{dep_id}}&per_page=10",
+          "host": ["{{base_url}}"],
+          "path": ["recherche"],
+          "query": [
+            { "key": "id_departement", "value": "{{dep_id}}" },
+            { "key": "per_page", "value": "10" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "6. Vérifier CORS (headers)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Header CORS présent', () => {",
+              "  pm.expect(pm.response.headers.get('Access-Control-Allow-Origin')).to.not.be.null;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "OPTIONS",
+        "header": [
+          { "key": "Origin", "value": "http://localhost" },
+          { "key": "Access-Control-Request-Method", "value": "GET" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/departements",
+          "host": ["{{base_url}}"],
+          "path": ["departements"]
+        }
+      }
+    }
+  ]
+}

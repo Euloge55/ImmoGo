@@ -5,12 +5,34 @@ use Illuminate\Database\Eloquent\Model;
 class Bien extends Model
 {
     protected $primaryKey = 'id_bien';
+
     protected $fillable = [
+        'id_agence',
+        'id_admin',
+        'id_typebien',
+        'titre_bien',
+        'description_bien',
+        'prix',
+        'superficie',
+        'localisation',
+        'statut',
+        'type_transaction',
+        'nombre_pieces',
+        'nombre_salles_bain',
+        'photos',
+        'id_departement',
+        'id_ville',
+        'id_quartier',
         'id_agence', 'id_admin', 'id_typebien',
         'titre_bien', 'description_bien', 'prix',
-        'superficie', 'localisation', 'statut', 'photos'
+        'superficie', 'localisation', 'statut',
+        'photos', 'id_departement', 'id_ville',
+        'id_quartier', 'type_contrat', 
     ];
-    protected $casts = ['photos' => 'array'];
+
+    protected $casts = [
+        'photos' => 'array',
+    ];
 
     public function agence()
     {
@@ -36,9 +58,6 @@ class Bien extends Model
     {
         return $this->hasMany(Favoris::class, 'id_bien', 'id_bien');
     }
-
-    public function publier() {}
-    public function modifierStatut() {}
 
     public function departement()
     {

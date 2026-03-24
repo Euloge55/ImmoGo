@@ -1,0 +1,262 @@
+<?php
+namespace App\Http\Controllers\Web;
+
+use App\Http\Controllers\Controller;
+use App\Models\Bien;
+use App\Models\Contrat;
+use App\Models\Administrateur;
+use App\Models\TypeBien;
+use App\Models\Departement;
+use App\Models\Ville;
+use App\Models\Quartier;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+
+class AdminWebController extends Controller
+{
+    private function checkAuth()
+    {
+        if (!session('admin')) {
+            return redirect()->route('login.admin')
+                           ->with('error', 'Accès réservé aux administrateurs');
+        }
+        return null;
+    }
+
+    // ═══ DASHBOARD ═══
+    public function dashboard()
+    {
+        if ($redirect = $this->checkAuth()) return $redirect;
+
+        $idAgence = session('admin')->id_agence;
+
+        $totalBiens      = Bien::where('id_agence', $idAgence)->count();
+        $biensDisponibles= Bien::where('id_agence', $idAgence)
+                               ->where('statut', 'disponible')->count();
+        $biensReserves   = Bien::where('id_agence', $idAgence)
+                               ->where('statut', 'reserve')->count();
+        $totalContrats   = Contrat::whereHas('bien', function($q) use ($idAgence) {
+                               $q->where('id_agence', $idAgence);
+                           })->count();
+
+        $derniersContrats = Contrat::with(['bien', 'client'])
+                                   ->whereHas('bien', function($q) use ($idAgence) {
+                                       $q->where('id_agence', $idAgence);
+                                   })->latest()->take(5)->get();
+
+        $derniersBiens = Bien::with(['typeBien', 'ville'])
+                             ->where('id_agence', $idAgence)
+                             ->latest()->take(5)->get();
+
+        return view('admin.dashboard', compact(
+            'totalBiens', 'biensDisponibles',
+            'biensReserves', 'totalContrats',
+            'derniersContrats', 'derniersBiens'
+        ));
+    }
+
+    // ═══ GESTION BIENS ═══
+    public function biens()
+    {
+        if ($redirect = $this->checkAuth()) return $redirect;
+
+        $biens = Bien::with(['typeBien', 'ville', 'departement'])
+                     ->where('id_agence', session('admin')->id_agence)
+                     ->latest()->paginate(10);
+
+        $typesBiens   = TypeBien::all();
+        $departements = Departement::orderBy('nom_departement')->get();
+
+        return view('admin.biens', compact('biens', 'typesBiens', 'departements'));
+    }
+
+    public function creerBien(Request $request)
+    {
+        if ($redirect = $this->checkAuth()) return $redirect;
+
+        $request->validate([
+            'id_typebien'      => 'required|exists:type_biens,id_typebien',
+            'titre_bien'       => 'required|string',
+            'description_bien' => 'required|string',
+            'prix'             => 'required|numeric',
+            'superficie'       => 'required|numeric',
+            'localisation'     => 'required|string',
+            'id_departement'   => 'required|exists:departements,id_departement',
+            'id_ville'         => 'required|exists:villes,id_ville',
+            'id_quartier'      => 'nullable|exists:quartiers,id_quartier',
+            'photos'           => 'nullable|array|max:5',
+            'photos.*'         => 'image|mimes:jpeg,png,jpg|max:2048',
+        ]);
+
+        // Upload des photos
+        $photosPaths = [];
+        if ($request->hasFile('photos')) {
+            foreach ($request->file('photos') as $photo) {
+                $path = $photo->store('biens', 'public');
+                $photosPaths[] = $path;
+            }
+        }
+
+        Bien::create([
+            'id_agence'        => session('admin')->id_agence,
+            'id_admin'         => session('admin')->id_admin,
+            'id_typebien'      => $request->id_typebien,
+            'titre_bien'       => $request->titre_bien,
+            'description_bien' => $request->description_bien,
+            'prix'             => $request->prix,
+            'superficie'       => $request->superficie,
+            'localisation'     => $request->localisation,
+            'id_departement'   => $request->id_departement,
+            'id_ville'         => $request->id_ville,
+            'id_quartier'      => $request->id_quartier,
+            'statut'           => 'disponible',
+            'type_contrat'     => $request->type_contrat, // ← présent ?
+            'photos'           => !empty($photosPaths) ? $photosPaths : null,
+        ]);
+
+        return redirect()->route('admin.biens')
+                        ->with('success', 'Bien créé avec succès !');
+    }
+
+    public function modifierBien(Request $request, $id)
+    {
+        if ($redirect = $this->checkAuth()) return $redirect;
+
+        $bien = Bien::where('id_bien', $id)
+                    ->where('id_agence', session('admin')->id_agence)
+                    ->firstOrFail();
+
+        $request->validate([
+            'titre_bien'       => 'required|string',
+            'description_bien' => 'required|string',
+            'prix'             => 'required|numeric',
+            'superficie'       => 'required|numeric',
+            'localisation'     => 'required|string',
+            'id_typebien'      => 'required|exists:type_biens,id_typebien',
+            'id_departement'   => 'required|exists:departements,id_departement',
+            'id_ville'         => 'required|exists:villes,id_ville',
+            'id_quartier'      => 'nullable|exists:quartiers,id_quartier',
+            'photos'           => 'nullable|array|max:5',
+            'photos.*'         => 'image|mimes:jpeg,png,jpg|max:2048',
+        ]);
+
+        $data = $request->except(['_token', '_method', 'photos']);
+
+        // Nouvelles photos si envoyées
+        if ($request->hasFile('photos')) {
+            $photosPaths = [];
+            foreach ($request->file('photos') as $photo) {
+                $path = $photo->store('biens', 'public');
+                $photosPaths[] = $path;
+            }
+            $data['photos'] = $photosPaths;
+        }
+
+        $bien->update($data);
+
+        return redirect()->route('admin.biens')
+                        ->with('success', 'Bien modifié avec succès !');
+    }
+
+    public function supprimerBien($id)
+    {
+        if ($redirect = $this->checkAuth()) return $redirect;
+
+        Bien::where('id_bien', $id)
+            ->where('id_agence', session('admin')->id_agence)
+            ->firstOrFail()->delete();
+
+        return redirect()->route('admin.biens')
+                        ->with('success', 'Bien supprimé avec succès !');
+    }
+
+    public function modifierStatutBien(Request $request, $id)
+    {
+        if ($redirect = $this->checkAuth()) return $redirect;
+
+        $bien = Bien::where('id_bien', $id)
+                    ->where('id_agence', session('admin')->id_agence)
+                    ->firstOrFail();
+
+        $bien->update(['statut' => $request->statut]);
+
+        return back()->with('success', 'Statut modifié avec succès !');
+    }
+
+    // ═══ GESTION RESERVATIONS ═══
+    public function reservations()
+    {
+        if ($redirect = $this->checkAuth()) return $redirect;
+
+        $contrats = Contrat::with(['bien', 'client', 'paiements', 'location', 'vente'])
+                           ->whereHas('bien', function($q) {
+                               $q->where('id_agence', session('admin')->id_agence);
+                           })->latest()->paginate(10);
+
+        return view('admin.reservations', compact('contrats'));
+    }
+
+    // ═══ GESTION ADMINISTRATEURS ═══
+    public function administrateurs()
+    {
+        if ($redirect = $this->checkAuth()) return $redirect;
+
+        $admins = Administrateur::where('id_agence', session('admin')->id_agence)->get();
+
+        return view('admin.administrateurs', compact('admins'));
+    }
+
+    public function creerAdministrateur(Request $request)
+    {
+        if ($redirect = $this->checkAuth()) return $redirect;
+
+        // Seul l'admin principal peut créer
+        if (!session('admin')->est_principal) {
+            return redirect()->route('admin.administrateurs')
+                            ->with('error', 'Seul l\'admin principal peut créer des administrateurs');
+        }
+
+        $request->validate([
+            'nom_admin'    => 'required|string',
+            'prenom_admin' => 'required|string',
+            'email'        => 'required|email|unique:administrateurs,email',
+            'mot_de_passe' => 'required|min:6',
+        ]);
+
+        Administrateur::create([
+            'id_agence'     => session('admin')->id_agence,
+            'nom_admin'     => $request->nom_admin,
+            'prenom_admin'  => $request->prenom_admin,
+            'email'         => $request->email,
+            'mot_de_passe'  => Hash::make($request->mot_de_passe),
+            'est_principal' => false,
+        ]);
+
+        return redirect()->route('admin.administrateurs')
+                        ->with('success', 'Administrateur créé avec succès !');
+    }
+
+    public function supprimerAdministrateur($id)
+    {
+        if ($redirect = $this->checkAuth()) return $redirect;
+
+        // Seul l'admin principal peut supprimer
+        if (!session('admin')->est_principal) {
+            return redirect()->route('admin.administrateurs')
+                            ->with('error', 'Seul l\'admin principal peut supprimer des administrateurs');
+        }
+
+        $admin = Administrateur::where('id_admin', $id)
+                            ->where('id_agence', session('admin')->id_agence)
+                            ->firstOrFail();
+
+        // Ne pas supprimer l'admin principal
+        if ($admin->est_principal) {
+            return back()->with('error', 'Impossible de supprimer l\'admin principal');
+        }
+
+        $admin->delete();
+
+        return back()->with('success', 'Administrateur supprimé');
+    }
+}

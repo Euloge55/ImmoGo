@@ -1,0 +1,398 @@
+openapi: 3.0.3
+info:
+  title: ImmoGo API
+  description: API REST pour l'application mobile ImmoGo — immobilier au Bénin
+  version: 1.0.0
+  contact:
+    name: ImmoGo Team
+
+servers:
+  - url: http://localhost:8000/api
+    description: Développement local
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum Token
+
+  schemas:
+    Bien:
+      type: object
+      properties:
+        id_bien:           { type: integer }
+        titre_bien:        { type: string }
+        description_bien:  { type: string }
+        prix:              { type: number, format: float }
+        superficie:        { type: number }
+        localisation:      { type: string }
+        statut:            { type: string, enum: [disponible, reserve, loue, vendu] }
+        type_transaction:  { type: string, enum: [location, vente], nullable: true }
+        nombre_pieces:     { type: integer, nullable: true }
+        nombre_salles_bain:{ type: integer, nullable: true }
+        photos:            { type: array, items: { type: string } }
+        agence:            { $ref: '#/components/schemas/Agence' }
+        type_bien:         { $ref: '#/components/schemas/TypeBien' }
+        departement:       { $ref: '#/components/schemas/Departement' }
+        ville:             { $ref: '#/components/schemas/Ville' }
+        quartier:          { $ref: '#/components/schemas/Quartier' }
+
+    PaginatedBiens:
+      type: object
+      properties:
+        data:         { type: array, items: { $ref: '#/components/schemas/Bien' } }
+        current_page: { type: integer }
+        last_page:    { type: integer }
+        total:        { type: integer }
+        per_page:     { type: integer }
+
+    Client:
+      type: object
+      properties:
+        id_client:     { type: integer }
+        nom_client:    { type: string }
+        prenom_client: { type: string }
+        email:         { type: string, format: email }
+        tel_client:    { type: string }
+
+    Agence:
+      type: object
+      properties:
+        id_agence:      { type: integer }
+        nom_agence:     { type: string }
+        adresse_agence: { type: string, nullable: true }
+        tel_agence:     { type: string, nullable: true }
+        email:          { type: string, nullable: true }
+        logo:           { type: string, nullable: true }
+
+    TypeBien:
+      type: object
+      properties:
+        id_typebien: { type: integer }
+        libelle:     { type: string }
+
+    Departement:
+      type: object
+      properties:
+        id_departement:  { type: integer }
+        nom_departement: { type: string }
+
+    Ville:
+      type: object
+      properties:
+        id_ville:       { type: integer }
+        id_departement: { type: integer }
+        nom_ville:      { type: string }
+
+    Quartier:
+      type: object
+      properties:
+        id_quartier: { type: integer }
+        id_ville:    { type: integer }
+        nom_quartier:{ type: string }
+
+    Contrat:
+      type: object
+      properties:
+        id_contrat:     { type: integer }
+        id_client:      { type: integer }
+        id_bien:        { type: integer }
+        type_contrat:   { type: string, enum: [location, vente] }
+        statut_contrat: { type: string, enum: [en_attente, confirme, annule] }
+        date_location:  { type: string, format: date, nullable: true }
+        bien:           { $ref: '#/components/schemas/Bien' }
+        location:       { $ref: '#/components/schemas/LocationDetail' }
+        vente:          { $ref: '#/components/schemas/VenteDetail' }
+
+    LocationDetail:
+      type: object
+      properties:
+        id_location:                 { type: integer }
+        montant_total_location:      { type: number }
+        date_reserv_location:        { type: string, format: date-time }
+        date_limite_solde_location:  { type: string, format: date-time }
+
+    VenteDetail:
+      type: object
+      properties:
+        id_vente:               { type: integer }
+        montant_total_vente:    { type: number }
+        date_reserv_vente:      { type: string, format: date-time }
+        date_limite_solde_vente:{ type: string, format: date-time }
+
+    Favori:
+      type: object
+      properties:
+        id_favoris: { type: integer }
+        id_client:  { type: integer }
+        id_bien:    { type: integer }
+        bien:       { $ref: '#/components/schemas/Bien' }
+
+    Error:
+      type: object
+      properties:
+        message: { type: string }
+
+paths:
+  # ── AUTH ──
+  /register/client:
+    post:
+      tags: [Auth]
+      summary: Inscription client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom_client, prenom_client, email, tel_client, mot_de_passe]
+              properties:
+                nom_client:    { type: string }
+                prenom_client: { type: string }
+                email:         { type: string, format: email }
+                tel_client:    { type: string }
+                mot_de_passe:  { type: string, minLength: 6 }
+      responses:
+        '201': { description: Compte créé }
+        '422': { description: Validation échouée }
+
+  /login/client:
+    post:
+      tags: [Auth]
+      summary: Connexion client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, mot_de_passe]
+              properties:
+                email:        { type: string, format: email }
+                mot_de_passe: { type: string }
+      responses:
+        '200':
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:  { type: string }
+                  client: { $ref: '#/components/schemas/Client' }
+        '401': { description: Identifiants incorrects }
+
+  /logout:
+    post:
+      tags: [Auth]
+      security: [{ BearerAuth: [] }]
+      summary: Déconnexion
+      responses:
+        '200': { description: Déconnecté }
+
+  /me:
+    get:
+      tags: [Client]
+      security: [{ BearerAuth: [] }]
+      summary: Profil du client connecté
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Client' }
+    put:
+      tags: [Client]
+      security: [{ BearerAuth: [] }]
+      summary: Modifier son profil
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom_client:    { type: string }
+                prenom_client: { type: string }
+                email:         { type: string }
+                tel_client:    { type: string }
+      responses:
+        '200': { description: Profil modifié }
+
+  # ── BIENS ──
+  /biens:
+    get:
+      tags: [Biens]
+      summary: Liste paginée des biens
+      parameters:
+        - { name: page,             in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page,         in: query, schema: { type: integer, default: 15 } }
+        - { name: statut,           in: query, schema: { type: string, enum: [disponible, reserve, loue, vendu] } }
+        - { name: id_typebien,      in: query, schema: { type: integer } }
+        - { name: type_transaction, in: query, schema: { type: string, enum: [location, vente] } }
+        - { name: prix_max,         in: query, schema: { type: number } }
+        - { name: nombre_pieces,    in: query, schema: { type: integer } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedBiens' }
+
+  /biens/{id}:
+    get:
+      tags: [Biens]
+      summary: Détail d'un bien
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bien' }
+        '404': { description: Bien introuvable }
+
+  # ── RECHERCHE ──
+  /recherche:
+    get:
+      tags: [Recherche]
+      summary: Recherche unifiée avec filtres
+      parameters:
+        - { name: q,                in: query, schema: { type: string } }
+        - { name: id_departement,   in: query, schema: { type: integer } }
+        - { name: id_ville,         in: query, schema: { type: integer } }
+        - { name: id_quartier,      in: query, schema: { type: integer } }
+        - { name: id_typebien,      in: query, schema: { type: integer } }
+        - { name: type_transaction, in: query, schema: { type: string, enum: [location, vente] } }
+        - { name: nombre_pieces,    in: query, schema: { type: integer } }
+        - { name: prix_min,         in: query, schema: { type: number } }
+        - { name: prix_max,         in: query, schema: { type: number } }
+        - { name: statut,           in: query, schema: { type: string } }
+        - { name: tri_prix,         in: query, schema: { type: string, enum: [asc, desc] } }
+        - { name: page,             in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page,         in: query, schema: { type: integer, default: 15 } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedBiens' }
+
+  # ── LOCALISATION ──
+  /departements:
+    get:
+      tags: [Localisation]
+      summary: Liste des départements
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Departement' } }
+
+  /departements/{id}/villes:
+    get:
+      tags: [Localisation]
+      summary: Villes d'un département
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Ville' } }
+
+  /villes/{id}/quartiers:
+    get:
+      tags: [Localisation]
+      summary: Quartiers d'une ville
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Quartier' } }
+
+  # ── FAVORIS ──
+  /favoris:
+    get:
+      tags: [Favoris]
+      security: [{ BearerAuth: [] }]
+      summary: Favoris du client connecté
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Favori' } }
+    post:
+      tags: [Favoris]
+      security: [{ BearerAuth: [] }]
+      summary: Ajouter aux favoris
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_bien]
+              properties:
+                id_bien: { type: integer }
+      responses:
+        '201': { description: Ajouté aux favoris }
+        '400': { description: Déjà dans les favoris }
+
+  /favoris/bien/{id_bien}:
+    delete:
+      tags: [Favoris]
+      security: [{ BearerAuth: [] }]
+      summary: Supprimer un favori par id_bien
+      parameters:
+        - { name: id_bien, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Retiré des favoris }
+
+  # ── CONTRATS ──
+  /contrats:
+    get:
+      tags: [Contrats]
+      security: [{ BearerAuth: [] }]
+      summary: Historique des contrats du client connecté
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Contrat' } }
+    post:
+      tags: [Contrats]
+      security: [{ BearerAuth: [] }]
+      summary: Créer une réservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_bien, type_contrat]
+              properties:
+                id_bien:       { type: integer }
+                type_contrat:  { type: string, enum: [location, vente] }
+                date_location: { type: string, format: date, nullable: true }
+      responses:
+        '201': { description: Réservation créée }
+        '400': { description: Bien non disponible }
+
+  /contrats/{id}/solde:
+    get:
+      tags: [Contrats]
+      security: [{ BearerAuth: [] }]
+      summary: Solde restant d'un contrat
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  montant_total:  { type: number }
+                  total_paye:     { type: number }
+                  solde_restant:  { type: number }
+                  date_limite:    { type: string, format: date-time }
